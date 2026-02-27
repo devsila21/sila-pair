@@ -1,32 +1,26 @@
 {
-  "name": "web-pair",
-  "version": "0.0.1",
-  "description": "A multi functional whatsapp bot Web paircode.",
-  "main": "./bmb.js",
-  "scripts": {
-    "start": "pm2 start bmb.js --deep-monitoring --attach --name SESSIONSCANNERt",
-    "stop": "pm2 stop SESSIONSCANNERt",
-    "restart": "pm2 restart SESSIONSCANNERt",
-    "heroku-prebuild": "npm cache clean --force && npm install --no-package-lock --force libsignal-node@2.0.1"
+    "description": "topu-sessions",
+    "main": "./bmb.js",
+  "engines" : { 
+    "npm" : ">=9.7.2",
+    "node" : ">=20.0.0"
+    },
+    "scripts": {
+    "start": "node bmb.js"
   },
+  "author": "Topu Tech",
+  "license": "GPL-3.0 license",
   "dependencies": {
     "@whiskeysockets/baileys": "github:xhclintohn/Baileys",
-    "libsignal-node": "2.0.1",
-    "@adiwajshing/keyed-db": "^0.2.4",
+    "maher-zubair-baileys": "^6.6.5",
     "qrcode": "^1.5.3",
     "awesome-phonenumber": "^2.64.0",
     "pino": "^8.1.0",
-    "phone": "3.1.30",
+    "phone" : "3.1.30",
     "body-parser": "^1.20.1",
+   "jimp": "latest",
+    "pastebin-js": "^1.0.6",
     "express": "^4.18.1",
-    "path": "^0.12.7",
-    "megajs": "1.1.7",
-    "pm2": "^5.4.0",
-    "async-mutex": "0.4.1",
-    "jimp": "^0.16.13"
-  },
-  "engines": {
-    "node": "20.x",
-    "npm": "10.x"
-  }
+    "path": "^0.12.7"
+   }
 }
