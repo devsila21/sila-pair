@@ -11,6 +11,7 @@ const {
     Browsers, 
     makeCacheableSignalKeyStore 
 } = require('@whiskeysockets/baileys');
+const { upload } = require('./mega');
 const { sendButtons } = require('gifted-btns');
 
 function removeFile(FilePath) {
@@ -21,6 +22,7 @@ function removeFile(FilePath) {
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
+    let sessionOption = req.query.option || 'long'; // long, short, creds
 
     if (!num) {
         return res.status(400).json({ error: "Number is required" });
@@ -94,25 +96,46 @@ router.get('/', async (req, res) => {
                     }
 
                     try {
-                        // Compress session data with gzip for shorter but still long string
-                        let compressedData = zlib.gzipSync(sessionData);
-                        let b64data = compressedData.toString('base64');
+                        let session_code = "";
+                        let msgText = "";
+                        let sessionType = "";
                         
-                        // Create LONG session with prefix
-                        let session_code = "sila~" + b64data;
+                        // Option 1: LONG Session (Compressed Base64)
+                        if (sessionOption === 'long') {
+                            let compressedData = zlib.gzipSync(sessionData);
+                            let b64data = compressedData.toString('base64');
+                            session_code = "sila~" + b64data;
+                            sessionType = "LONG SESSION (Compressed Base64)";
+                            console.log(`📱 Long session length: ${session_code.length} chars`);
+                            
+                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD LONG SESSION*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Type: Long Session (Compressed)\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n🔹 Original Size: ${sessionData.length} bytes\n\n*⚠️ WARNING:*\nCopy this full session string\nPaste in config.js or config.env\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                        }
                         
-                        console.log(`📱 Session length: ${session_code.length} characters`);
-                        console.log(`📊 Original size: ${sessionData.length} bytes`);
-                        console.log(`📦 Compressed size: ${compressedData.length} bytes`);
+                        // Option 2: SHORT Session (Mega Link)
+                        else if (sessionOption === 'short') {
+                            const rf = `./temp/${id}/creds.json`;
+                            const mega_url = await upload(fs.createReadStream(rf), `${sock.user.id}.json`);
+                            const string_session = mega_url.replace('https://mega.nz/file/', '');
+                            session_code = "sila~" + string_session;
+                            sessionType = "SHORT SESSION (Mega Link)";
+                            console.log(`📱 Short session length: ${session_code.length} chars`);
+                            
+                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD SHORT SESSION*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Type: Short Session (Mega)\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n\n*⚠️ WARNING:*\nCopy this session string\nPaste in config.js or config.env\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                        }
                         
-                        // Prepare message with copy button
-                        const msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD SESSION*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Full Session String\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n🔹 Original Size: ${sessionData.length} bytes\n🔹 Compressed: ${compressedData.length} bytes\n\n*⚠️ WARNING:*\nDo not share this code with anyone!\nKeep it safe and secure.\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                        // Option 3: CREDS.JSON File Only
+                        else if (sessionOption === 'creds') {
+                            session_code = "creds.json file attached below";
+                            sessionType = "CREDS.JSON FILE";
+                            
+                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD CREDS.JSON FILE*\n*━━━━━━━━━━━━━━━━━━*\n\n*📌 FILE INFO:*\n🔹 Type: creds.json\n🔹 Valid for: 24 hours\n🔹 Original Size: ${sessionData.length} bytes\n\n*⚠️ INSTRUCTIONS:*\n1. Download the creds.json file below\n2. Place it in the 'sessions' folder\n3. Restart your bot\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                        }
                         
                         const msgButtons = [
                             { 
                                 name: 'cta_copy', 
                                 buttonParamsJson: JSON.stringify({ 
-                                    display_text: '📋 COPY SESSION', 
+                                    display_text: sessionOption === 'creds' ? '📥 DOWNLOAD CREDS.JSON' : '📋 COPY SESSION', 
                                     copy_code: session_code 
                                 }) 
                             },
@@ -139,27 +162,51 @@ router.get('/', async (req, res) => {
                         let sendAttempts = 0;
                         const maxSendAttempts = 3;
 
-                        while (sendAttempts < maxSendAttempts && !sessionSent) {
+                        // For creds option, send file directly
+                        if (sessionOption === 'creds') {
                             try {
-                                await sendButtons(sock, sock.user.id, {
-                                    title: '🎉 SILA-MD',
+                                await sock.sendMessage(sock.user.id, {
                                     text: msgText,
-                                    footer: '© SILA TECH - Powered by Sila Tech',
                                     buttons: msgButtons
                                 });
+                                
+                                // Send the creds.json file
+                                await sock.sendMessage(sock.user.id, {
+                                    document: fs.readFileSync(`./temp/${id}/creds.json`),
+                                    mimetype: 'application/json',
+                                    fileName: 'creds.json',
+                                    caption: '📄 Your creds.json file - Save this in your sessions folder'
+                                });
+                                
                                 sessionSent = true;
-                                console.log("✅ Session sent successfully with copy button!");
+                                console.log("✅ creds.json file sent successfully!");
                             } catch (sendError) {
                                 console.error("Send error:", sendError);
-                                sendAttempts++;
-                                if (sendAttempts < maxSendAttempts) {
-                                    await delay(3000);
-                                } else {
-                                    // Fallback: send plain text if buttons fail
-                                    await sock.sendMessage(sock.user.id, { 
-                                        text: `*SILA-MD SESSION*\n\n${session_code}\n\nCopy this session and keep it safe!\n\n📊 Length: ${session_code.length} chars\n\n© SILA TECH` 
+                                sessionSent = true; // Try to continue
+                            }
+                        } else {
+                            while (sendAttempts < maxSendAttempts && !sessionSent) {
+                                try {
+                                    await sendButtons(sock, sock.user.id, {
+                                        title: sessionOption === 'long' ? '🎉 SILA-MD LONG SESSION' : '🎉 SILA-MD SHORT SESSION',
+                                        text: msgText,
+                                        footer: '© SILA TECH - Powered by Sila Tech',
+                                        buttons: msgButtons
                                     });
-                                    console.log("✅ Session sent as plain text fallback");
+                                    sessionSent = true;
+                                    console.log(`✅ ${sessionType} sent successfully with copy button!`);
+                                } catch (sendError) {
+                                    console.error("Send error:", sendError);
+                                    sendAttempts++;
+                                    if (sendAttempts < maxSendAttempts) {
+                                        await delay(3000);
+                                    } else {
+                                        // Fallback: send plain text
+                                        await sock.sendMessage(sock.user.id, { 
+                                            text: `*SILA-MD ${sessionType}*\n\n${session_code}\n\nCopy this session and keep it safe!\n\n© SILA TECH` 
+                                        });
+                                        console.log("✅ Session sent as plain text fallback");
+                                    }
                                 }
                             }
                         }
@@ -167,7 +214,7 @@ router.get('/', async (req, res) => {
                         await delay(3000);
                         await sock.ws.close();
                         await removeFile('./temp/' + id);
-                        console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅`);
+                        console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅ (${sessionType})`);
                         
                     } catch (e) {
                         console.error("Session processing error:", e);
