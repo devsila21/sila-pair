@@ -23,7 +23,7 @@ html,body{
   font-family:Rajdhani,sans-serif;
   color:var(--text);
   background:url("https://files.catbox.moe/36vahk.png") center/cover no-repeat fixed;
-  overflow:hidden;
+  overflow:auto;
   position:relative;
 }
 
@@ -34,16 +34,16 @@ body::before{
   inset:0;
   background:rgba(0,0,0,.65);
   z-index:0;
-  transition:background 0.3s ease;
 }
 
 /* CARD */
 .frame{
   position:relative;
   z-index:2;
-  max-width:400px;
+  max-width:450px;
   margin:auto;
-  top:16%;
+  top:5%;
+  margin-bottom:100px;
   padding:34px;
   border-radius:24px;
   background:var(--panel);
@@ -103,10 +103,79 @@ body::before{
   margin-bottom:22px;
 }
 
+/* OPTIONS SECTION */
+.options-section{
+  margin-bottom:25px;
+  text-align:left;
+}
+
+.options-title{
+  font-size:0.85rem;
+  margin-bottom:12px;
+  color:var(--yellow);
+  font-weight:bold;
+}
+
+.option-group{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.option-card{
+  flex:1;
+  min-width:110px;
+  cursor:pointer;
+}
+
+.option-card input{
+  display:none;
+}
+
+.option-card .card-content{
+  border:2px solid rgba(0,255,136,.3);
+  border-radius:12px;
+  padding:12px;
+  text-align:center;
+  transition:all 0.3s ease;
+  cursor:pointer;
+  background:rgba(2,8,20,.6);
+}
+
+.option-card input:checked + .card-content{
+  border-color:var(--green);
+  background:linear-gradient(135deg, rgba(0,255,136,0.2), rgba(255,230,0,0.1));
+  transform:scale(1.02);
+  box-shadow:0 0 15px rgba(0,255,136,.3);
+}
+
+.option-card .card-content:hover{
+  border-color:var(--yellow);
+  transform:translateY(-2px);
+}
+
+.option-icon{
+  font-size:28px;
+  margin-bottom:8px;
+}
+
+.option-title{
+  font-weight:bold;
+  color:var(--green);
+  font-size:0.85rem;
+  margin-bottom:4px;
+}
+
+.option-desc{
+  font-size:9px;
+  color:rgba(255,255,255,.7);
+}
+
 /* INPUT */
 .input-container{
   display:flex;
   gap:12px;
+  margin-bottom:15px;
 }
 
 input{
@@ -117,6 +186,13 @@ input{
   border:1px solid rgba(0,255,136,.4);
   color:var(--text);
   font-family:JetBrains Mono;
+  font-size:16px;
+}
+
+input:focus{
+  outline:none;
+  border-color:var(--green);
+  box-shadow:0 0 10px rgba(0,255,136,.3);
 }
 
 button.main{
@@ -127,6 +203,18 @@ button.main{
   font-weight:700;
   background:linear-gradient(135deg,var(--yellow),var(--green));
   color:#02130c;
+  transition:all 0.3s ease;
+}
+
+button.main:hover{
+  transform:scale(1.02);
+  box-shadow:0 0 20px rgba(0,255,136,.5);
+}
+
+button.main:disabled{
+  opacity:0.6;
+  cursor:not-allowed;
+  transform:none;
 }
 
 /* MESSAGE */
@@ -139,6 +227,7 @@ button.main{
   font-family:JetBrains Mono;
   font-size:.9rem;
   text-align:left;
+  word-break:break-all;
 }
 
 #copy-btn{
@@ -148,6 +237,14 @@ button.main{
   border-radius:30px;
   background:linear-gradient(135deg,#fff200,#00ff88);
   font-weight:700;
+  padding:12px;
+  border:none;
+  cursor:pointer;
+  transition:all 0.3s ease;
+}
+
+#copy-btn:hover{
+  transform:scale(1.02);
 }
 
 /* FLOATING WHATSAPP */
@@ -191,7 +288,20 @@ button.main{
   box-shadow:0 0 18px rgba(0,255,136,.6);
 }
 
-audio{display:none}
+.loading{
+  display:inline-block;
+  width:16px;
+  height:16px;
+  border:2px solid rgba(0,0,0,.3);
+  border-radius:50%;
+  border-top-color:#02130c;
+  animation:spin 1s ease-in-out infinite;
+  margin-right:8px;
+}
+
+@keyframes spin{
+  to{transform:rotate(360deg);}
+}
 </style>
 </head>
 
@@ -208,13 +318,46 @@ audio{display:none}
 
   <div id="subtitle"></div>
 
+  <!-- OPTIONS SECTION -->
+  <div class="options-section">
+    <div class="options-title">⚙️ SESSION TYPE</div>
+    <div class="option-group">
+      <label class="option-card">
+        <input type="radio" name="option" value="long" checked>
+        <div class="card-content">
+          <div class="option-icon">📦</div>
+          <div class="option-title">Long Session</div>
+          <div class="option-desc">Compressed Base64<br>Very long string</div>
+        </div>
+      </label>
+      
+      <label class="option-card">
+        <input type="radio" name="option" value="short">
+        <div class="card-content">
+          <div class="option-icon">🔗</div>
+          <div class="option-title">Short Session</div>
+          <div class="option-desc">Mega Link<br>Short string</div>
+        </div>
+      </label>
+      
+      <label class="option-card">
+        <input type="radio" name="option" value="creds">
+        <div class="card-content">
+          <div class="option-icon">📄</div>
+          <div class="option-title">Creds.json</div>
+          <div class="option-desc">Direct File<br>Download creds.json</div>
+        </div>
+      </label>
+    </div>
+  </div>
+
   <div class="input-container">
-    <input id="number" type="number">
-    <button class="main" id="submit"></button>
+    <input id="number" type="tel" placeholder="2557xxxxxxxx">
+    <button class="main" id="submit">ENTER</button>
   </div>
 
   <div id="waiting-message"></div>
-  <button id="copy-btn"></button>
+  <button id="copy-btn">📋 COPY CODE</button>
 </div>
 
 <!-- Floating WhatsApp -->
@@ -222,40 +365,57 @@ audio{display:none}
 
 <!-- Controls -->
 <div class="controls">
-  <button id="toggle-music">⏯ Play / Pause</button>
-  <button id="toggle-overlay">🌙 Overlay</button>
+  <button id="toggle-overlay">🌙 Toggle Overlay</button>
 </div>
 
-<audio id="bgm" src="https://files.catbox.moe/iwpfp2.mp3" loop></audio>
-
 <script>
-/* MUSIC */
-const bgm=document.getElementById("bgm");
-document.addEventListener("click",()=>{if(bgm.paused) bgm.play()},{once:true});
-document.getElementById("toggle-music").onclick=()=>bgm.paused?bgm.play():bgm.pause();
-
 /* DARK OVERLAY */
-const overlay=document.body;
 let overlayOn=true;
-document.getElementById("toggle-overlay").onclick=()=>{
-  overlayOn=!overlayOn;
-  overlay.style.setProperty("--overlay-opacity", overlayOn?'.65':'0');
-  document.querySelector('body::before');
-  document.body.style.setProperty('--overlay-opacity', overlayOn?'.65':'0');
-  document.body.style.backgroundColor='rgba(0,0,0,'+(overlayOn?.65:0)+')';
-  // simple hack: adjust pseudo element
-  const styleEl = document.styleSheets[0];
-  for(let i=0;i<styleEl.cssRules.length;i++){
-    if(styleEl.cssRules[i].selectorText=='body::before'){
-      styleEl.cssRules[i].style.background=`rgba(0,0,0,${overlayOn?.65:0})`;
+const bodyElement=document.body;
+const styleSheet=document.styleSheets[0];
+
+function updateOverlay(){
+  for(let i=0;i<styleSheet.cssRules.length;i++){
+    if(styleSheet.cssRules[i].selectorText === 'body::before'){
+      styleSheet.cssRules[i].style.background = `rgba(0,0,0,${overlayOn ? '0.65' : '0'})`;
+      break;
     }
   }
+}
+
+document.getElementById("toggle-overlay").onclick=()=>{
+  overlayOn=!overlayOn;
+  updateOverlay();
 };
 
 /* LANGUAGE DATA */
 const T={
-  en:{sub:"PAIR CODE SYSTEM",ph:"WhatsApp Number",enter:"ENTER",invalid:"Invalid WhatsApp number",gen:"Generating code...",code:"PAIR CODE: ",copy:"📋 COPY CODE",copied:"✔ COPIED"},
-  sw:{sub:"MFUMO WA PAIR CODE",ph:"Namba ya WhatsApp",enter:"INGIA",invalid:"Namba si sahihi",gen:"Inazalisha code...",code:"CODE: ",copy:"📋 NAKILI CODE",copied:"✔ IMENAKILIWA"}
+  en:{
+    sub:"PAIR CODE SYSTEM",
+    ph:"WhatsApp Number",
+    enter:"ENTER",
+    invalid:"Invalid WhatsApp number! Use format: 2557xxxxxxxx",
+    gen:"Generating pairing code...",
+    waiting:"Waiting for session...",
+    code:"PAIR CODE: ",
+    copy:"📋 COPY CODE",
+    copied:"✔ COPIED!",
+    sessionSent:"Session will be sent to your WhatsApp!",
+    credsSent:"📄 creds.json file will be sent to your WhatsApp!"
+  },
+  sw:{
+    sub:"MFUMO WA PAIR CODE",
+    ph:"Namba ya WhatsApp",
+    enter:"INGIA",
+    invalid:"Namba si sahihi! Tumia: 2557xxxxxxxx",
+    gen:"Inazalisha code...",
+    waiting:"Inasubiri session...",
+    code:"CODE: ",
+    copy:"📋 NAKILI CODE",
+    copied:"✔ IMENAKILIWA!",
+    sessionSent:"Session itatumwa kwa WhatsApp yako!",
+    credsSent:"📄 faili ya creds.json itatumwa kwa WhatsApp yako!"
+  }
 };
 
 let lang="en";
@@ -263,7 +423,7 @@ const subtitle=document.getElementById("subtitle");
 const number=document.getElementById("number");
 const submit=document.getElementById("submit");
 const msg=document.getElementById("waiting-message");
-const copy=document.getElementById("copy-btn");
+const copyBtn=document.getElementById("copy-btn");
 
 function setLang(l){
   lang=l;
@@ -274,26 +434,72 @@ function setLang(l){
   document.getElementById("sw").classList.toggle("active",l==="sw");
 }
 setLang("en");
-en.onclick=()=>setLang("en");
-sw.onclick=()=>setLang("sw");
+document.getElementById("en").onclick=()=>setLang("en");
+document.getElementById("sw").onclick=()=>setLang("sw");
 
 /* PAIR CODE LOGIC */
+let currentCode="";
+
 submit.onclick=async()=>{
   const v=number.value.replace(/\D/g,"");
-  if(!v||v.length<11){
-    msg.style.display="block"; msg.textContent=T[lang].invalid; copy.style.display="none"; return;
+  if(!v||v.length<10){
+    msg.style.display="block"; 
+    msg.textContent=T[lang].invalid; 
+    copyBtn.style.display="none"; 
+    return;
   }
-  msg.style.display="block"; msg.textContent=T[lang].gen;
+  
+  // Get selected option
+  const selectedOption = document.querySelector('input[name="option"]:checked').value;
+  
+  msg.style.display="block"; 
+  msg.textContent=T[lang].gen;
+  copyBtn.style.display="none";
+  submit.disabled=true;
+  submit.innerHTML='<span class="loading"></span> PROCESSING...';
+  
   try{
-    const r=await fetch(`/code?number=${v}`);
-    const d=await r.json();
-    const code=d.code||"Unavailable";
-    msg.textContent=T[lang].code+code;
-    copy.style.display="block"; copy.textContent=T[lang].copy;
-    copy.onclick=()=>{navigator.clipboard.writeText(code); copy.textContent=T[lang].copied; setTimeout(()=>copy.textContent=T[lang].copy,2000);}
-  }catch{msg.textContent="Service error";}
+    const response=await fetch(`/code?number=${v}&option=${selectedOption}`);
+    const data=await response.json();
+    
+    if(data.code){
+      currentCode=data.code;
+      msg.textContent=T[lang].code+currentCode;
+      copyBtn.style.display="block";
+      copyBtn.textContent=T[lang].copy;
+      
+      // Show info message based on option
+      setTimeout(() => {
+        if(selectedOption === 'creds'){
+          msg.textContent=T[lang].credsSent;
+        } else {
+          msg.textContent=T[lang].sessionSent;
+        }
+      }, 2000);
+      
+      copyBtn.onclick=()=>{
+        navigator.clipboard.writeText(currentCode);
+        copyBtn.textContent=T[lang].copied;
+        setTimeout(()=>copyBtn.textContent=T[lang].copy,2000);
+      };
+    } else if(data.error){
+      msg.textContent="❌ "+data.error;
+    } else {
+      msg.textContent="❌ Service error. Please try again.";
+    }
+  } catch(e){
+    console.error(e);
+    msg.textContent="❌ Network error. Check your connection.";
+  } finally {
+    submit.disabled=false;
+    submit.innerHTML="ENTER";
+  }
 };
-</script>
 
+// Allow Enter key
+number.addEventListener("keypress", (e) => {
+  if(e.key === "Enter") submit.click();
+});
+</script>
 </body>
 </html>
