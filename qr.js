@@ -1,4 +1,10 @@
-const {
+const { makeid } = require('./gen-id');
+const express = require('express');
+const fs = require('fs');
+const pino = require("pino");
+const QRCode = require('qrcode');
+let router = express.Router();
+const { 
     default: makeWASocket,
     useMultiFileAuthState,
     delay,
@@ -16,7 +22,7 @@ router.get('/', async (req, res) => {
     const id = makeid();
     const startTime = Date.now();
 
-    async function SILA_MD_PAIR_CODE() {
+    async function SILA_MD_QR_CODE() {
         const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
 
         try {
@@ -24,7 +30,10 @@ router.get('/', async (req, res) => {
             const randomItem = items[Math.floor(Math.random() * items.length)];
 
             let sock = makeWASocket({
-                auth: state,
+                auth: {
+                    creds: state.creds,
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
+                },
                 printQRInTerminal: false,
                 logger: pino({ level: "silent" }),
                 browser: Browsers.macOS(randomItem),
@@ -39,7 +48,10 @@ router.get('/', async (req, res) => {
 
                 try {
                     // send QR code if available
-                    if (qr) return await res.end(await QRCode.toBuffer(qr));
+                    if (qr) {
+                        const qrBuffer = await QRCode.toBuffer(qr);
+                        return res.setHeader('Content-Type', 'image/png').send(qrBuffer);
+                    }
 
                     if (connection == "open") {
                         await delay(3000);
@@ -64,10 +76,10 @@ router.get('/', async (req, res) => {
                             let session_code = "sila~" + string_session;
 
                             // send session code first
-                            let code = await sock.sendMessage(sock.user.id,                         let code = await sock.sendMessage(sock.user.id, { text: 'sila~'+ b64data });
+                            let codeMsg = await sock.sendMessage(sock.user.id, { text: session_code });
 
                             // send styled message with BOX
-                            let text = `┏━❑ *SILA-MD SESSION* ✅
+                            let textMsg = `┏━❑ *SILA-MD SESSION* ✅
 ┏━❑ *SAFETY RULES* ━━━━━━━━━
 ┃ 🔹 *Session ID:* Sent above.
 ┃ 🔹 *Warning:* Do not share this code!.
@@ -89,7 +101,7 @@ router.get('/', async (req, res) => {
 > © 𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐁𝐲 𝐒𝐢𝐥𝐚 𝐓𝐞𝐜𝐡`;
 
                             await sock.sendMessage(sock.user.id, {
-                                text: desc,
+                                text: textMsg,
                                 contextInfo: {
                                     externalAdReply: {
                                         title: 'SILA MD',
@@ -112,14 +124,15 @@ router.get('/', async (req, res) => {
                                     isForwarded: true,
                                     forwardingScore: 999
                                 }
-                            }, { quoted: code });
+                            });
 
                         } catch (e) {
+                            console.error("Error in session upload:", e);
                             let ddd = await sock.sendMessage(sock.user.id, { text: e.toString() });
 
-                            let text = `┏━❑ *SILA-MD SESSION* ⚠️
+                            let textMsg = `┏━❑ *SILA-MD SESSION* ⚠️
 ┏━❑ *SAFETY RULES* ━━━━━━━━━
-┃ 🔹 *Session ID:* Sent above.
+┃ 🔹 *Session ID:* Error occurred
 ┃ 🔹 *Warning:* Do not share this code!.
 ┃ 🔹 Keep this code safe.
 ┃ 🔹 Valid for 24 hours only.
@@ -139,7 +152,7 @@ router.get('/', async (req, res) => {
 > © 𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐁𝐲 𝐒𝐢𝐥𝐚 𝐓𝐞𝐜𝐡`;
 
                             await sock.sendMessage(sock.user.id, {
-                                text: desc,
+                                text: textMsg,
                                 contextInfo: {
                                     externalAdReply: {
                                         title: 'SILA MD',
@@ -162,7 +175,7 @@ router.get('/', async (req, res) => {
                                     isForwarded: true,
                                     forwardingScore: 999
                                 }
-                            }, { quoted: ddd });
+                            });
                         }
 
                         await delay(10);
@@ -170,15 +183,15 @@ router.get('/', async (req, res) => {
                         await removeFile('./temp/' + id);
                         console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅`);
                         await delay(10);
-                        process.exit();
+                        process.exit(0);
                     }
                 } catch (err) {
                     console.log("⚠️ Error in connection.update:", err);
                 }
 
-                if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
+                if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output?.statusCode != 401) {
                     await delay(10);
-                    SILA_MD_PAIR_CODE();
+                    SILA_MD_QR_CODE();
                 }
             });
 
@@ -186,17 +199,12 @@ router.get('/', async (req, res) => {
             console.log("⚠️ SILA-MD Connection failed — Restarting service...", err);
             await removeFile('./temp/' + id);
             if (!res.headersSent) {
-                await res.send({ code: "❗ SILA-MD Service Unavailable" });
+                await res.status(500).json({ error: "Service Unavailable" });
             }
         }
     }
 
-    await SILA_MD_PAIR_CODE();
+    await SILA_MD_QR_CODE();
 });
-
-setInterval(() => {
-    console.log("🔄 SILA-MD Restarting process...");
-    process.exit();
-}, 1800000); // 30 minutes
 
 module.exports = router;
