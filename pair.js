@@ -22,7 +22,7 @@ function removeFile(FilePath) {
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
-    let sessionOption = req.query.option || 'long';
+    let sessionOption = req.query.option || 'long'; // long, short, creds
     let responseSent = false;
 
     if (!num) {
@@ -51,18 +51,13 @@ router.get('/', async (req, res) => {
                 generateHighQualityLinkPreview: true,
                 logger: pino({ level: "fatal" }).child({ level: "fatal" }),
                 syncFullHistory: false,
-                browser: Browsers.macOS(randomItem),
-                connectTimeoutMs: 60000,
-                keepAliveIntervalMs: 30000
+                browser: Browsers.macOS(randomItem)
             });
             
-            // Send pairing code
             if (!sock.authState.creds.registered) {
-                await delay(2000);
-                console.log(`📱 Requesting pairing code for: ${num}`);
+                await delay(1500);
                 const code = await sock.requestPairingCode(num);
                 console.log(`✅ Pairing code sent: ${code}`);
-                
                 if (!responseSent && !res.headersSent) {
                     res.json({ 
                         code: code,
@@ -78,13 +73,13 @@ router.get('/', async (req, res) => {
             sock.ev.on("connection.update", async (s) => {
                 const { connection, lastDisconnect } = s;
 
-                if (connection === "open") {
-                    console.log(`✅ Connected successfully as: ${sock.user.id}`);
-                    await delay(8000); // Wait longer for session to be ready
+                if (connection == "open") {
+                    console.log(`✅ Connected as: ${sock.user.id}`);
+                    await delay(5000);
 
                     let sessionData = null;
                     let attempts = 0;
-                    const maxAttempts = 30;
+                    const maxAttempts = 20;
 
                     console.log("⏳ Waiting for session file...");
                     
@@ -95,15 +90,13 @@ router.get('/', async (req, res) => {
                                 const data = fs.readFileSync(credsPath);
                                 if (data && data.length > 100) {
                                     sessionData = data;
-                                    console.log(`✅ Session file found (${data.length} bytes) after ${attempts + 1} attempts`);
+                                    console.log(`✅ Session file found (${data.length} bytes)`);
                                     break;
                                 }
                             }
-                            await delay(2000);
+                            await delay(3000);
                             attempts++;
-                            if (attempts % 5 === 0) {
-                                console.log(`⏳ Still waiting for session... (${attempts}/${maxAttempts})`);
-                            }
+                            console.log(`⏳ Waiting for session... (${attempts}/${maxAttempts})`);
                         } catch (readError) {
                             console.error("Read error:", readError);
                             await delay(2000);
@@ -112,9 +105,8 @@ router.get('/', async (req, res) => {
                     }
 
                     if (!sessionData) {
-                        console.error("❌ Session data not found after retries");
-                        await sock.sendMessage(sock.user.id, { text: "❌ Failed to generate session. Please try again." });
-                        await cleanUp();
+                        console.error("❌ Session data not found");
+                        await removeFile('./temp/' + id);
                         return;
                     }
 
@@ -130,8 +122,9 @@ router.get('/', async (req, res) => {
                             session_code = "sila~" + b64data;
                             sessionType = "LONG SESSION";
                             console.log(`📱 Long session length: ${session_code.length} chars`);
+                            console.log(`📊 Original: ${sessionData.length} bytes | Compressed: ${compressedData.length} bytes`);
                             
-                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD ${sessionType}*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Type: Long Session (Compressed)\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n🔹 Original Size: ${sessionData.length} bytes\n\n*⚠️ WARNING:*\nCopy this full session string\nPaste in config.js or config.env\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD ${sessionType}*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Type: Long Session (Compressed Base64)\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n🔹 Original Size: ${sessionData.length} bytes\n\n*⚠️ WARNING:*\nCopy this full session string\nPaste in config.js or config.env\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
                         }
                         
                         // Option 2: SHORT Session (Mega Link)
@@ -143,7 +136,7 @@ router.get('/', async (req, res) => {
                             sessionType = "SHORT SESSION";
                             console.log(`📱 Short session length: ${session_code.length} chars`);
                             
-                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD ${sessionType}*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Type: Short Session (Mega)\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n\n*⚠️ WARNING:*\nCopy this session string\nPaste in config.js or config.env\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                            msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD ${sessionType}*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Type: Short Session (Mega Link)\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n\n*⚠️ WARNING:*\nCopy this session string\nPaste in config.js or config.env\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
                         }
                         
                         // Option 3: CREDS.JSON File Only
@@ -157,7 +150,7 @@ router.get('/', async (req, res) => {
                             { 
                                 name: 'cta_copy', 
                                 buttonParamsJson: JSON.stringify({ 
-                                    display_text: sessionOption === 'creds' ? '📥 DOWNLOAD CREDS.JSON' : '📋 COPY SESSION', 
+                                    display_text: sessionOption === 'creds' ? '📥 GET CREDS.JSON' : '📋 COPY SESSION', 
                                     copy_code: session_code 
                                 }) 
                             },
@@ -177,9 +170,9 @@ router.get('/', async (req, res) => {
                             }
                         ];
 
-                        await delay(3000);
+                        await delay(2000);
                         
-                        // Send session based on option
+                        // Send based on option
                         if (sessionOption === 'creds') {
                             // Send message first
                             await sock.sendMessage(sock.user.id, { text: msgText });
@@ -225,47 +218,39 @@ router.get('/', async (req, res) => {
                             }
                         }
 
-                        await delay(5000);
+                        await delay(3000);
                         await sock.ws.close();
-                        await cleanUp();
+                        await removeFile('./temp/' + id);
                         console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅ (${sessionType})`);
                         process.exit(0);
                         
                     } catch (e) {
                         console.error("Session processing error:", e);
                         try {
-                            await sock.sendMessage(sock.user.id, { text: `❌ Error: ${e.message}` });
+                            await sock.sendMessage(sock.user.id, { text: `Error: ${e.message}` });
                         } catch (err) {
                             console.error("Failed to send error message:", err);
                         }
-                        await cleanUp();
+                        await removeFile('./temp/' + id);
                     }
 
+                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output?.statusCode != 401) {
+                    console.log("🔄 Reconnecting...");
+                    await delay(5000);
+                    SILA_MD_PAIR_CODE();
                 } else if (connection === "close") {
                     console.log("❌ Connection closed");
-                    if (lastDisconnect && lastDisconnect.error) {
-                        console.log("Disconnect error:", lastDisconnect.error);
-                    }
-                    await cleanUp();
+                    await removeFile('./temp/' + id);
                 }
             });
             
         } catch (err) {
-            console.error("Main error:", err);
+            console.log("⚠️ SILA-MD Connection failed:", err);
+            await removeFile('./temp/' + id);
             if (!responseSent && !res.headersSent) {
-                res.status(500).json({ error: "Service is Currently Unavailable" });
+                await res.status(500).json({ error: "Service is Currently Unavailable" });
                 responseSent = true;
             }
-            await cleanUp();
-        }
-    }
-    
-    async function cleanUp() {
-        try {
-            await removeFile('./temp/' + id);
-            console.log("🧹 Session cleaned up");
-        } catch (err) {
-            console.error("Cleanup error:", err);
         }
     }
 
