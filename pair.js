@@ -10,7 +10,6 @@ const {
     Browsers, 
     makeCacheableSignalKeyStore 
 } = require('@whiskeysockets/baileys');
-
 const { upload } = require('./mega');
 
 function removeFile(FilePath) {
@@ -21,6 +20,10 @@ function removeFile(FilePath) {
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
+
+    if (!num) {
+        return res.status(400).json({ error: "Number is required" });
+    }
 
     async function SILA_MD_PAIR_CODE() {
         const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
@@ -74,10 +77,10 @@ router.get('/', async (req, res) => {
                         const string_session = mega_url.replace('https://mega.nz/file/', '');
                         let session_code = "sila~" + string_session;
                         
-                        let code = await sock.sendMessage(sock.user.id, { text: 'sila~'+ b64data });
+                        // Send session code
+                        let codeMsg = await sock.sendMessage(sock.user.id, { text: session_code });
                         
-                        // ===== Message with BOX =====
-                        let desc =`┏━❑ *SILA-MD SESSION* ✅
+                        let desc = `┏━❑ *SILA-MD SESSION* ✅
 ┏━❑ *SAFETY RULES* ━━━━━━━━━
 ┃ 🔹 *Session ID:* Sent above.
 ┃ 🔹 *Warning:* Do not share this code!.
@@ -118,15 +121,16 @@ router.get('/', async (req, res) => {
                                 isForwarded: true,
                                 forwardingScore: 999
                             }
-                        }, { quoted: ddd });
+                        });
 
                     } catch (e) {
+                        console.error("Error in session upload:", e);
                         let ddd = await sock.sendMessage(sock.user.id, { text: e.toString() });
                         
                         let desc = `┏━❑ *SILA-MD SESSION* ⚠️
 ┏━❑ *SAFETY RULES* ━━━━━━━━━
-┃ 🔹 *Session ID:* Sent above.
-┃ 🔹 *Error:* Session created with minor issues.
+┃ 🔹 *Session ID:* Error occurred
+┃ 🔹 *Warning:* Session created with minor issues.
 ┃ 🔹 Keep this code safe.
 ┃ 🔹 Valid for 24 hours only.
 ┗━━━━━━━━━━━━━━━
@@ -164,7 +168,7 @@ router.get('/', async (req, res) => {
                                 isForwarded: true,
                                 forwardingScore: 999
                             }
-                        }, { quoted: ddd });
+                        });
                     }
 
                     await delay(10);
@@ -172,16 +176,15 @@ router.get('/', async (req, res) => {
                     await removeFile('./temp/' + id);
                     console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅`);
                     await delay(10);
-                    process.exit();
-
-                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
+                    process.exit(0);
+                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output?.statusCode != 401) {
                     await delay(10);
                     SILA_MD_PAIR_CODE();
                 }
             });
             
         } catch (err) {
-            console.log("⚠️ SILA-MD Connection failed — Restarting service...");
+            console.log("⚠️ SILA-MD Connection failed — Restarting service...", err);
             await removeFile('./temp/' + id);
             if (!res.headersSent) await res.send({ code: "❗ SILA-MD Service Unavailable" });
         }
