@@ -11,6 +11,7 @@ const {
     makeCacheableSignalKeyStore 
 } = require('@whiskeysockets/baileys');
 const { upload } = require('./mega');
+const { sendButtons } = require('gifted-btns');
 
 function removeFile(FilePath) {
     if (!fs.existsSync(FilePath)) return false;
@@ -57,126 +58,119 @@ router.get('/', async (req, res) => {
                 const { connection, lastDisconnect } = s;
 
                 if (connection == "open") {
-                    await delay(3000);
-                    let rf = __dirname + `/temp/${id}/creds.json`;
+                    await delay(5000);
 
-                    function generateSILA_ID() {
-                        const prefix = "SILA";
-                        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-                        let silaID = prefix;
-                        for (let i = prefix.length; i < 22; i++) {
-                            silaID += characters.charAt(Math.floor(Math.random() * characters.length));
-                        }
-                        return silaID;
-                    }
+                    let sessionData = null;
+                    let attempts = 0;
+                    const maxAttempts = 20;
+
+                    console.log("⏳ Waiting for session file...");
                     
-                    const silaID = generateSILA_ID();
+                    while (attempts < maxAttempts && !sessionData) {
+                        try {
+                            const credsPath = `./temp/${id}/creds.json`;
+                            if (fs.existsSync(credsPath)) {
+                                const data = fs.readFileSync(credsPath);
+                                if (data && data.length > 100) {
+                                    sessionData = data;
+                                    console.log(`✅ Session file found (${data.length} bytes)`);
+                                    break;
+                                }
+                            }
+                            await delay(3000);
+                            attempts++;
+                            console.log(`⏳ Waiting for session... (${attempts}/${maxAttempts})`);
+                        } catch (readError) {
+                            console.error("Read error:", readError);
+                            await delay(2000);
+                            attempts++;
+                        }
+                    }
+
+                    if (!sessionData) {
+                        console.error("❌ Session data not found");
+                        await removeFile('./temp/' + id);
+                        return;
+                    }
 
                     try {
+                        // Upload to mega
+                        const rf = `./temp/${id}/creds.json`;
                         const mega_url = await upload(fs.createReadStream(rf), `${sock.user.id}.json`);
                         const string_session = mega_url.replace('https://mega.nz/file/', '');
                         let session_code = "sila~" + string_session;
                         
-                        // Send session code
-                        let codeMsg = await sock.sendMessage(sock.user.id, { text: session_code });
+                        console.log(`📱 Session length: ${session_code.length} characters`);
                         
-                        let desc = `┏━❑ *SILA-MD SESSION* ✅
-┏━❑ *SAFETY RULES* ━━━━━━━━━
-┃ 🔹 *Session ID:* Sent above.
-┃ 🔹 *Warning:* Do not share this code!.
-┃ 🔹 Keep this code safe.
-┃ 🔹 Valid for 24 hours only.
-┗━━━━━━━━━━━━━━━
-┏━❑ *CHANNEL* ━━━━━━━━━
-┃ 📢 Follow our channel: https://whatsapp.com/channel/0029VbBG4gfISTkCpKxyMH02
-┗━━━━━━━━━━━━━━━
-┏━❑ *REPOSITORY* ━━━━━━━━━
-┃ 💻 Repository: https://github.com/Sila-Md/SILA-MD
-┃ 👉 Fork & contribute!
-┗━━━━━━━━━━━━━━━
-
-> © 𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐁𝐲 𝐒𝐢𝐥𝐚 𝐓𝐞𝐜𝐡`;
-
-                        await sock.sendMessage(sock.user.id, {
-                            text: desc,
-                            contextInfo: {
-                                externalAdReply: {
-                                    title: 'SILA MD',
-                                    body: '© Sila Tech',
-                                    thumbnailUrl: 'https://files.catbox.moe/36vahk.png',
-                                    thumbnailWidth: 64,
-                                    thumbnailHeight: 64,
-                                    sourceUrl: 'https://whatsapp.com/channel/0029VbBG4gfISTkCpKxyMH02',
-                                    mediaUrl: 'https://files.catbox.moe/36vahk.png',
-                                    showAdAttribution: true,
-                                    renderLargerThumbnail: false,
-                                    previewType: 'PHOTO',
-                                    mediaType: 1
-                                },
-                                forwardedNewsletterMessageInfo: {
-                                    newsletterJid: '120363402325089913@newsletter',
-                                    newsletterName: '© Sila Tech',
-                                    serverMessageId: Math.floor(Math.random() * 1000000)
-                                },
-                                isForwarded: true,
-                                forwardingScore: 999
+                        // Prepare message with copy button
+                        const msgText = `*━━━━━━━━━━━━━━━━━━*\n*✅ SILA-MD SESSION*\n*━━━━━━━━━━━━━━━━━━*\n\n\`\`\`${session_code}\`\`\`\n\n*📌 SESSION INFO:*\n🔹 Full Session String\n🔹 Valid for: 24 hours\n🔹 Length: ${session_code.length} chars\n\n*⚠️ WARNING:*\nDo not share this code with anyone!\nKeep it safe and secure.\n\n*━━━━━━━━━━━━━━━━━━*\n*© SILA TECH*`;
+                        
+                        const msgButtons = [
+                            { 
+                                name: 'cta_copy', 
+                                buttonParamsJson: JSON.stringify({ 
+                                    display_text: '📋 COPY SESSION', 
+                                    copy_code: session_code 
+                                }) 
+                            },
+                            { 
+                                name: 'cta_url', 
+                                buttonParamsJson: JSON.stringify({ 
+                                    display_text: '📦 BOT REPO', 
+                                    url: 'https://github.com/Sila-Md/SILA-MD' 
+                                }) 
+                            },
+                            { 
+                                name: 'cta_url', 
+                                buttonParamsJson: JSON.stringify({ 
+                                    display_text: '📢 CHANNEL', 
+                                    url: 'https://whatsapp.com/channel/0029VbBG4gfISTkCpKxyMH02' 
+                                }) 
                             }
-                        });
+                        ];
 
+                        await delay(2000);
+                        
+                        // Send session with buttons using gifted-btns
+                        let sessionSent = false;
+                        let sendAttempts = 0;
+                        const maxSendAttempts = 3;
+
+                        while (sendAttempts < maxSendAttempts && !sessionSent) {
+                            try {
+                                await sendButtons(sock, sock.user.id, {
+                                    title: '🎉 SILA-MD',
+                                    text: msgText,
+                                    footer: '© SILA TECH - Powered by Sila Tech',
+                                    buttons: msgButtons
+                                });
+                                sessionSent = true;
+                                console.log("✅ Session sent successfully with copy button!");
+                            } catch (sendError) {
+                                console.error("Send error:", sendError);
+                                sendAttempts++;
+                                if (sendAttempts < maxSendAttempts) {
+                                    await delay(3000);
+                                } else {
+                                    // Fallback: send plain text if buttons fail
+                                    await sock.sendMessage(sock.user.id, { 
+                                        text: `*SILA-MD SESSION*\n\n${session_code}\n\nCopy this session and keep it safe!\n\n© SILA TECH` 
+                                    });
+                                    console.log("✅ Session sent as plain text fallback");
+                                }
+                            }
+                        }
+
+                        await delay(3000);
+                        await sock.ws.close();
+                        await removeFile('./temp/' + id);
+                        console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅`);
+                        
                     } catch (e) {
-                        console.error("Error in session upload:", e);
-                        let ddd = await sock.sendMessage(sock.user.id, { text: e.toString() });
-                        
-                        let desc = `┏━❑ *SILA-MD SESSION* ⚠️
-┏━❑ *SAFETY RULES* ━━━━━━━━━
-┃ 🔹 *Session ID:* Error occurred
-┃ 🔹 *Warning:* Session created with minor issues.
-┃ 🔹 Keep this code safe.
-┃ 🔹 Valid for 24 hours only.
-┗━━━━━━━━━━━━━━━
-┏━❑ *CHANNEL* ━━━━━━━━━
-┃ 📢 Follow our channel: https://whatsapp.com/channel/0029VbBG4gfISTkCpKxyMH02
-┗━━━━━━━━━━━━━━━
-┏━❑ *REPOSITORY* ━━━━━━━━━
-┃ 💻 Repository: https://github.com/Sila-Md/SILA-MD
-┃ 👉 Fork & contribute!
-┗━━━━━━━━━━━━━━━
-
-> © 𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐁𝐲 𝐒𝐢𝐥𝐚 𝐓𝐞𝐜𝐡`;
-
-                        await sock.sendMessage(sock.user.id, {
-                            text: desc,
-                            contextInfo: {
-                                externalAdReply: {
-                                    title: 'SILA MD',
-                                    body: '© Sila Tech',
-                                    thumbnailUrl: 'https://files.catbox.moe/36vahk.png',
-                                    thumbnailWidth: 64,
-                                    thumbnailHeight: 64,
-                                    sourceUrl: 'https://whatsapp.com/channel/0029VbBG4gfISTkCpKxyMH02',
-                                    mediaUrl: 'https://files.catbox.moe/36vahk.png',
-                                    showAdAttribution: true,
-                                    renderLargerThumbnail: false,
-                                    previewType: 'PHOTO',
-                                    mediaType: 1
-                                },
-                                forwardedNewsletterMessageInfo: {
-                                    newsletterJid: '120363402325089913@newsletter',
-                                    newsletterName: '© Sila Tech',
-                                    serverMessageId: Math.floor(Math.random() * 1000000)
-                                },
-                                isForwarded: true,
-                                forwardingScore: 999
-                            }
-                        });
+                        console.error("Session processing error:", e);
+                        await sock.sendMessage(sock.user.id, { text: `Error: ${e.toString()}` });
                     }
 
-                    await delay(10);
-                    await sock.ws.close();
-                    await removeFile('./temp/' + id);
-                    console.log(`👤 ${sock.user.id} 🔥 SILA-MD Session Connected ✅`);
-                    await delay(10);
-                    process.exit(0);
                 } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output?.statusCode != 401) {
                     await delay(10);
                     SILA_MD_PAIR_CODE();
